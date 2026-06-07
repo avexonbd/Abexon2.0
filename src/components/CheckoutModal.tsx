@@ -534,7 +534,7 @@ export default function CheckoutModal({ isOpen, onClose, preselectedWebsiteTitle
         fetch("/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newOrder)
+          body: JSON.stringify({ ...newOrder, isNewOrderClient: true })
         }).catch(err => console.warn("Failed server order sync: ", err));
 
         // Also client-side upsert directly to Supabase flat table for instant cross-browser broadcast
@@ -649,7 +649,7 @@ export default function CheckoutModal({ isOpen, onClose, preselectedWebsiteTitle
       fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newOrder)
+        body: JSON.stringify({ ...newOrder, isNewOrderClient: true })
       }).catch(err => console.warn("Failed server order sync: ", err));
 
       // Also client-side upsert directly to Supabase flat table for instant cross-browser broadcast

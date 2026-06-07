@@ -551,7 +551,13 @@ function getSupabaseOrdersClient() {
 
 // Helper to normalize phone numbers for BulkSMSBD to 880XXXXXXXXXX format
 function formatSMSNumber(phone: string): string {
-  const cleanPhone = phone.replace(/\D/g, "");
+  if (!phone) return "";
+  const bengaliDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+  let cleanPhone = phone;
+  for (let i = 0; i < 10; i++) {
+    cleanPhone = cleanPhone.replaceAll(bengaliDigits[i], String(i));
+  }
+  cleanPhone = cleanPhone.replace(/\D/g, "");
   if (cleanPhone.length === 11 && cleanPhone.startsWith("0")) {
     return "88" + cleanPhone;
   }
@@ -1152,8 +1158,10 @@ app.post("/api/orders", async (req, res) => {
     }
 
     // Determine if this is a brand new order or a dashboard status change/edit
-    const isNewOrder = !localOrders.some((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim()) &&
-                       !cloudOrders.some((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim());
+    const isNewOrderClient = req.body.isNewOrderClient === true;
+    const isNewOrder = isNewOrderClient ||
+                       (!localOrders.some((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim()) &&
+                        !cloudOrders.some((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim()));
 
     // 3. Merge pools properly preserving modern updates and non-'Pending' status variations
     const mergedMap = new Map<string, any>();
@@ -1248,8 +1256,9 @@ app.post("/api/orders", async (req, res) => {
 
               const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
 
-              // 1. Send SMS to Client if enabled & phone exists
-              if (smsEnabledClient && activeApiKey && incomingOrder.customerPhone) {
+              // 1. Send SMS to Client if enabled & phone exists (defaults to enabled for seamless client notifications)
+              const isClientSmsActive = smsEnabledClient !== false;
+              if (isClientSmsActive && activeApiKey && incomingOrder.customerPhone) {
                 const message = formatSMSTemplate(smsClientTemplate || "", incomingOrder);
                 if (message) {
                   await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message);
