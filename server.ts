@@ -632,7 +632,6 @@ async function sendBulkSMS(apiKey: string, senderId: string, number: string, mes
          .replace(/\{sender_id\}/gi, activeSenderId)
          .replace(/\[NUMBER\]/gi, formattedNumber)
          .replace(/\{number\}/gi, formattedNumber)
-         .replace(/\[MESSAGE\]/gi, message) // Use raw message style if user's API does encoding, but we safe-encode next or let them handle it. Actually URL template usually requires encoded message, or sometimes we auto-encode. Let's do encodeURIComponent.
          .replace(/\[MESSAGE\]/gi, encodedMsg)
          .replace(/\{message\}/gi, encodedMsg);
     } else {
@@ -1308,10 +1307,16 @@ app.post("/api/orders", async (req, res) => {
     // Dispatch "Done" SMS asynchronously in the background when order status changes to "Done" (completed website)
     const existingOrder = localOrders.find((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim()) ||
                            cloudOrders.find((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim());
-    const isChangingToDone = existingOrder && existingOrder.status !== "Done" && incomingOrder.status === "Done";
-    const isReadymadeOrder = incomingOrder.paymentMethod !== "custom_pkg";
 
-    if (isChangingToDone && isReadymadeOrder) {
+    const oldStatusNorm = existingOrder ? String(existingOrder.status || "").trim().toLowerCase() : "";
+    const newStatusNorm = incomingOrder ? String(incomingOrder.status || "").trim().toLowerCase() : "";
+
+    // Trigger Done SMS if order previously was not Done, but now is Done, OR if a new order starts directly as Done
+    const isChangingToDone = (oldStatusNorm !== "done" && newStatusNorm === "done") || (isNewOrder && newStatusNorm === "done");
+
+    console.log(`[Done SMS Trigger] Checking status change. ID: ${incomingOrder.id}, New Status: ${incomingOrder.status}, Old Status: ${existingOrder ? existingOrder.status : 'None'}, isChangingToDone: ${isChangingToDone}`);
+
+    if (isChangingToDone) {
       (async () => {
         try {
           const contact = await getLatestContactConfig();
@@ -1324,14 +1329,18 @@ app.post("/api/orders", async (req, res) => {
             } = contact;
 
             const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
+            const isDoneSmsActive = smsEnabledDone !== false;
 
-            // Send SMS to Client if enabled & phone exists
-            if (smsEnabledDone && activeApiKey && incomingOrder.customerPhone) {
-              const template = smsDoneTemplate || "প্রিয় [NAME], আপনার রেডিমেড ওয়েবসাইট ওর্ডার [ORDER_ID] টি সম্পূর্ণ রেডি! ওর্ডার ট্র্যাকিং এ গিয়ে আপনার ওয়েবসাইটের এডমিন প্যানেল ইমেইল ও পাসওয়ার্ড সংগ্রহ করে নিন। ধন্যবাদ - Avexon।";
+            // Send SMS to Client if enabled (defaults to true) & phone exists
+            if (isDoneSmsActive && activeApiKey && incomingOrder.customerPhone) {
+              const template = smsDoneTemplate || "প্রিয় [NAME], আপনার ওর্ডার [ORDER_ID] টি সম্পূর্ণ রেডি! ওর্ডার ট্র্যাকিং এ গিয়ে আপনার ওয়েবসাইটের এডমিন প্যানেল ইমেইল ও পাসওয়ার্ড সংগ্রহ করে নিন। ধন্যবাদ - Avexon।";
               const message = formatSMSTemplate(template, incomingOrder);
               if (message) {
+                console.log(`[Done SMS Trigger] Dispatching completed SMS to Client. Recipient: ${incomingOrder.customerPhone}, Message: "${message}"`);
                 await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message, contact.smsApiUrl);
               }
+            } else {
+              console.log(`[Done SMS Trigger] SMS skipped. Active: ${isDoneSmsActive}, Key present: ${!!activeApiKey}, Recipient: ${incomingOrder.customerPhone}`);
             }
           }
         } catch (smsErr) {
