@@ -564,6 +564,36 @@ function formatSMSNumber(phone: string): string {
   return cleanPhone;
 }
 
+// Helper to retrieve the absolute latest contact and SMS gateway configs from database (primary) or local file (fallback)
+async function getLatestContactConfig(): Promise<any> {
+  const dbClient = getSupabaseClient();
+  let dbConfig: any = null;
+  if (dbClient) {
+    try {
+      const { data, error } = await dbClient
+        .from("avexon_content")
+        .select("value")
+        .eq("key", "contactConfig")
+        .single();
+      if (!error && data && data.value) {
+        dbConfig = data.value;
+      }
+    } catch (e) {
+      console.warn("Could not fetch remote contactConfig settings for SMS dispatch:", e);
+    }
+  }
+
+  let localConfig: any = null;
+  if (fs.existsSync(CONTENT_DB_FILE)) {
+    try {
+      const contentData = JSON.parse(fs.readFileSync(CONTENT_DB_FILE, "utf-8"));
+      localConfig = contentData?.contactConfig;
+    } catch (_) {}
+  }
+
+  return { ...localConfig, ...dbConfig };
+}
+
 // BulkSMSBD API trigger
 async function sendBulkSMS(apiKey: string, senderId: string, number: string, message: string, customApiUrl?: string) {
   if (!apiKey || !number || !message) {
@@ -577,11 +607,9 @@ async function sendBulkSMS(apiKey: string, senderId: string, number: string, mes
   let activeApiUrl = customApiUrl;
   if (!activeApiUrl) {
     try {
-      if (fs.existsSync(CONTENT_DB_FILE)) {
-        const contentData = JSON.parse(fs.readFileSync(CONTENT_DB_FILE, "utf-8"));
-        if (contentData && contentData.contactConfig && contentData.contactConfig.smsApiUrl) {
-          activeApiUrl = contentData.contactConfig.smsApiUrl;
-        }
+      const contact = await getLatestContactConfig();
+      if (contact && contact.smsApiUrl) {
+        activeApiUrl = contact.smsApiUrl;
       }
     } catch (_) {}
   }
@@ -1240,37 +1268,34 @@ app.post("/api/orders", async (req, res) => {
     if (isNewOrder) {
       (async () => {
         try {
-          if (fs.existsSync(CONTENT_DB_FILE)) {
-            const contentData = JSON.parse(fs.readFileSync(CONTENT_DB_FILE, "utf-8"));
-            const contact = contentData.contactConfig;
-            if (contact) {
-              const {
-                smsApiKey,
-                smsSenderId,
-                smsAdminNumber,
-                smsEnabledClient,
-                smsEnabledAdmin,
-                smsClientTemplate,
-                smsAdminTemplate
-              } = contact;
+          const contact = await getLatestContactConfig();
+          if (contact) {
+            const {
+              smsApiKey,
+              smsSenderId,
+              smsAdminNumber,
+              smsEnabledClient,
+              smsEnabledAdmin,
+              smsClientTemplate,
+              smsAdminTemplate
+            } = contact;
 
-              const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
+            const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
 
-              // 1. Send SMS to Client if enabled & phone exists (defaults to enabled for seamless client notifications)
-              const isClientSmsActive = smsEnabledClient !== false;
-              if (isClientSmsActive && activeApiKey && incomingOrder.customerPhone) {
-                const message = formatSMSTemplate(smsClientTemplate || "", incomingOrder);
-                if (message) {
-                  await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message);
-                }
+            // 1. Send SMS to Client if enabled & phone exists (defaults to enabled for seamless client notifications)
+            const isClientSmsActive = smsEnabledClient !== false;
+            if (isClientSmsActive && activeApiKey && incomingOrder.customerPhone) {
+              const message = formatSMSTemplate(smsClientTemplate || "", incomingOrder);
+              if (message) {
+                await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message, contact.smsApiUrl);
               }
+            }
 
-              // 2. Send SMS to Admin if enabled & admin phone exists
-              if (smsEnabledAdmin && activeApiKey && smsAdminNumber) {
-                const message = formatSMSTemplate(smsAdminTemplate || "", incomingOrder);
-                if (message) {
-                  await sendBulkSMS(activeApiKey, smsSenderId || "", smsAdminNumber, message);
-                }
+            // 2. Send SMS to Admin if enabled & admin phone exists
+            if (smsEnabledAdmin && activeApiKey && smsAdminNumber) {
+              const message = formatSMSTemplate(smsAdminTemplate || "", incomingOrder);
+              if (message) {
+                await sendBulkSMS(activeApiKey, smsSenderId || "", smsAdminNumber, message, contact.smsApiUrl);
               }
             }
           }
@@ -1282,33 +1307,30 @@ app.post("/api/orders", async (req, res) => {
 
     // Dispatch "Done" SMS asynchronously in the background when order status changes to "Done" (completed website)
     const existingOrder = localOrders.find((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim()) ||
-                          cloudOrders.find((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim());
+                           cloudOrders.find((o: any) => o && String(o.id).trim() === String(incomingOrder.id).trim());
     const isChangingToDone = existingOrder && existingOrder.status !== "Done" && incomingOrder.status === "Done";
     const isReadymadeOrder = incomingOrder.paymentMethod !== "custom_pkg";
 
     if (isChangingToDone && isReadymadeOrder) {
       (async () => {
         try {
-          if (fs.existsSync(CONTENT_DB_FILE)) {
-            const contentData = JSON.parse(fs.readFileSync(CONTENT_DB_FILE, "utf-8"));
-            const contact = contentData.contactConfig;
-            if (contact) {
-              const {
-                smsApiKey,
-                smsSenderId,
-                smsEnabledDone,
-                smsDoneTemplate
-              } = contact;
+          const contact = await getLatestContactConfig();
+          if (contact) {
+            const {
+              smsApiKey,
+              smsSenderId,
+              smsEnabledDone,
+              smsDoneTemplate
+            } = contact;
 
-              const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
+            const activeApiKey = smsApiKey || "trgAiL014d0Ssuzr3a5A";
 
-              // Send SMS to Client if enabled & phone exists
-              if (smsEnabledDone && activeApiKey && incomingOrder.customerPhone) {
-                const template = smsDoneTemplate || "প্রিয় [NAME], আপনার রেডিমেড ওয়েবসাইট ওর্ডার [ORDER_ID] টি সম্পূর্ণ রেডি! ওর্ডার ট্র্যাকিং এ গিয়ে আপনার ওয়েবসাইটের এডমিন প্যানেল ইমেইল ও পাসওয়ার্ড সংগ্রহ করে নিন। ধন্যবাদ - Avexon।";
-                const message = formatSMSTemplate(template, incomingOrder);
-                if (message) {
-                  await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message);
-                }
+            // Send SMS to Client if enabled & phone exists
+            if (smsEnabledDone && activeApiKey && incomingOrder.customerPhone) {
+              const template = smsDoneTemplate || "প্রিয় [NAME], আপনার রেডিমেড ওয়েবসাইট ওর্ডার [ORDER_ID] টি সম্পূর্ণ রেডি! ওর্ডার ট্র্যাকিং এ গিয়ে আপনার ওয়েবসাইটের এডমিন প্যানেল ইমেইল ও পাসওয়ার্ড সংগ্রহ করে নিন। ধন্যবাদ - Avexon।";
+              const message = formatSMSTemplate(template, incomingOrder);
+              if (message) {
+                await sendBulkSMS(activeApiKey, smsSenderId || "", incomingOrder.customerPhone, message, contact.smsApiUrl);
               }
             }
           }
