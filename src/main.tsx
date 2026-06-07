@@ -38,8 +38,8 @@ if (typeof window !== "undefined") {
       try {
         const href = window.location.href || document.URL || "";
         if (href && href.startsWith("http")) {
-          const isCloudRun = href.includes(".run.app") || href.includes("localhost") || href.includes("127.0.0.1") || href.includes("192.168.");
-          if (isCloudRun) {
+          const isLocalOrContainer = href.includes(".run.app") || href.includes("localhost") || href.includes("127.0.0.1") || href.includes("192.168.") || href.includes("onrender.com") || href.includes("render.com") || href.includes("vercel.app") || href.includes("netlify.app") || (!href.includes("ai.studio") && !href.includes("googleusercontent.com") && window.self === window.top);
+          if (isLocalOrContainer) {
             const match = href.match(/^(https?:\/\/[^\/]+)/);
             if (match) {
               absoluteBaseUrl = match[1];
@@ -48,13 +48,13 @@ if (typeof window !== "undefined") {
         }
       } catch (_) {}
 
-      // 2. Check window.location.origin if it is a valid Cloud Run or localhost origin
+      // 2. Check window.location.origin if it is a valid Cloud Run, Render, or localhost origin
       if (!absoluteBaseUrl) {
         try {
           const origin = window.location.origin;
           if (origin && origin !== "null" && origin.startsWith("http")) {
-            const isCloudRun = origin.includes(".run.app") || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("192.168.");
-            if (isCloudRun) {
+            const isLocalOrContainer = origin.includes(".run.app") || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("192.168.") || origin.includes("onrender.com") || origin.includes("render.com") || origin.includes("vercel.app") || origin.includes("netlify.app") || (!origin.includes("ai.studio") && !origin.includes("googleusercontent.com") && window.self === window.top);
+            if (isLocalOrContainer) {
               absoluteBaseUrl = origin;
             }
           }
