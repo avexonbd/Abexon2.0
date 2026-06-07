@@ -119,7 +119,7 @@ if (typeof window !== "undefined") {
       // 6. Hardcoded system configuration parameters specifically matching this live preview sandbox run!
       if (!absoluteBaseUrl) {
         try {
-          const containerId = "ipuxpftgfhnjhuotjs5q4d-34985570118";
+          const containerId = "fssy552flgt2akywrhsogk-482860741721";
           const isPre = document.referrer && document.referrer.includes("-pre-");
           const mode = isPre ? "pre" : "dev";
           absoluteBaseUrl = `https://ais-${mode}-${containerId}.asia-southeast1.run.app`;
@@ -128,11 +128,11 @@ if (typeof window !== "undefined") {
 
       // 7. Last resort default fallback (pre backend)
       if (!absoluteBaseUrl) {
-        absoluteBaseUrl = "https://ais-pre-ipuxpftgfhnjhuotjs5q4d-34985570118.asia-southeast1.run.app";
+        absoluteBaseUrl = "https://ais-pre-fssy552flgt2akywrhsogk-482860741721.asia-southeast1.run.app";
       }
 
       // Expose active backend URL globally for tools/admin panel to reference
-      let activeBaseUrl = absoluteBaseUrl || "https://ais-pre-ipuxpftgfhnjhuotjs5q4d-34985570118.asia-southeast1.run.app";
+      let activeBaseUrl = absoluteBaseUrl || "https://ais-pre-fssy552flgt2akywrhsogk-482860741721.asia-southeast1.run.app";
       (window as any).__avexon_active_backend_url = activeBaseUrl;
 
       // Auto-Heal & Auto-Sync Backend URL:

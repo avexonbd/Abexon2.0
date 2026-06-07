@@ -7532,7 +7532,7 @@ create policy "Allow all actions" on public.avexon_content for all using (true) 
                           <p className="font-semibold text-purple-400">🚨 আপনার বর্তমান রানিং ব্যাকএন্ড ইউআরএল:</p>
                           <div className="flex items-center justify-between gap-3 bg-black/40 p-2.5 rounded-lg border border-purple-500/5 font-mono text-[10.5px]">
                             <span className="text-cyan-300 select-all break-all">
-                              {typeof window !== "undefined" ? ((window as any).__avexon_active_backend_url || "https://ais-pre-ipuxpftgfhnjhuotjs5q4d-34985570118.asia-southeast1.run.app") : ""}
+                              {typeof window !== "undefined" ? ((window as any).__avexon_active_backend_url || "https://ais-pre-fssy552flgt2akywrhsogk-482860741721.asia-southeast1.run.app") : ""}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button
@@ -7547,7 +7547,7 @@ create policy "Allow all actions" on public.avexon_content for all using (true) 
                                 type="button"
                                 onClick={() => {
                                   if (typeof window !== "undefined") {
-                                    const urlToCopy = (window as any).__avexon_active_backend_url || "https://ais-pre-ipuxpftgfhnjhuotjs5q4d-34985570118.asia-southeast1.run.app";
+                                    const urlToCopy = (window as any).__avexon_active_backend_url || "https://ais-pre-fssy552flgt2akywrhsogk-482860741721.asia-southeast1.run.app";
                                     navigator.clipboard.writeText(urlToCopy);
                                     triggerSuccessAlert("ব্যাকএন্ড ইউআরএল ক্লিপবোর্ডে কপি হয়েছে!");
                                   }
